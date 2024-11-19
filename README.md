@@ -1,12 +1,73 @@
-This Python script is a stock analysis tool that uses Yahoo Finance to fetch historical stock data and visualize it with technical indicators. Key features include:
+# Import necessary libraries
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import numpy as np
+import yfinance as yf
+from mplfinance.original_flavor import candlestick_ohlc
+from pandas_datareader import data as pdr
+import datetime as dt
 
-Data Fetching: Retrieves historical stock prices (Open, High, Low, Close, Adjusted Close, Volume) for a user-specified ticker symbol and date range.
+# Activate Yahoo Finance's workaround for downloading data
+yf.pdr_override()
 
-Moving Averages: Calculates and plots simple moving averages (SMAs) to analyze trends over time.
+# Define the moving averages to use
+moving_averages = [20]
 
-Bollinger Bands: Computes and visualizes upper and lower Bollinger Bands to identify price volatility and potential breakouts.
+# Get user input for the stock symbol and date range
+stock_symbol = input("Enter a stock ticker symbol (e.g., AAPL): ")
+start_date = input("Enter start date (YYYY-MM-DD): ")
+end_date = input("Enter end date (YYYY-MM-DD): ")
 
-Candlestick Charts: Creates candlestick charts to show daily price movements visually.
+# Loop to allow multiple stock analyses until the user exits
+while stock_symbol.lower() != "quit":
 
-User Interaction: Allows users to analyze multiple stocks in a single session by entering new tickers.
-The script is designed for beginners to understand basic technical analysis while leveraging Python for data analysis and visualization.
+    # Fetch stock price data using Yahoo Finance
+    stock_data = pdr.get_data_yahoo(stock_symbol, start_date, end_date)
+
+    # Create a plot for visualization
+    fig, ax = plt.subplots()
+
+    # Add moving averages to the data
+    for ma in moving_averages:
+        stock_data[f"SMA_{ma}"] = stock_data['Adj Close'].rolling(window=ma).mean()
+
+    # Bollinger Bands calculation
+    bb_period = 20  # Bollinger Band period
+    std_dev = 2  # Number of standard deviations
+    stock_data['SMA_BB'] = stock_data['Adj Close'].rolling(window=bb_period).mean()
+    stock_data['STDEV'] = stock_data['Adj Close'].rolling(window=bb_period).std()
+    stock_data['UpperBand'] = stock_data['SMA_BB'] + (std_dev * stock_data['STDEV'])
+    stock_data['LowerBand'] = stock_data['SMA_BB'] - (std_dev * stock_data['STDEV'])
+
+    # Prepare data for candlestick plotting
+    stock_data["Date"] = mdates.date2num(stock_data.index)  # Convert dates to numerical format
+    ohlc_data = stock_data[['Date', 'Open', 'High', 'Low', 'Adj Close']].values.tolist()
+
+    # Plot candlestick chart
+    candlestick_ohlc(ax, ohlc_data, width=0.6, colorup='green', colordown='red', alpha=0.8)
+
+    # Plot moving averages
+    for ma in moving_averages:
+        ax.plot(stock_data['Date'], stock_data[f"SMA_{ma}"], label=f"SMA {ma}")
+
+    # Plot Bollinger Bands
+    ax.plot(stock_data['Date'], stock_data['UpperBand'], label="Upper Band", linestyle='--', color='grey')
+    ax.plot(stock_data['Date'], stock_data['LowerBand'], label="Lower Band", linestyle='--', color='grey')
+
+    # Format x-axis for dates
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    plt.xticks(rotation=45)
+
+    # Add labels, title, and legend
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Price')
+    ax.set_title(f"{stock_symbol} Price Chart")
+    ax.legend()
+
+    # Show the plot
+    plt.tight_layout()
+    plt.show()
+
+    # Prompt user for the next stock symbol or to quit
+    stock_symbol = input("Enter another stock ticker symbol (or type 'quit' to exit): ")
